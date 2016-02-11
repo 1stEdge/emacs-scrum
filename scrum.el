@@ -211,6 +211,8 @@
 (defun org-dblock-write:block-update-summary (params)
   "generate scrum summary table"
   (let (developers
+	(hid  8.0)                ;; hours in a day
+	(cap  0)                ;; capacity
         (est  0)                ;; hours estimated
         (act  0)                ;; actual hours spent
         (done 0)                ;; hours of estimates that are done
@@ -218,22 +220,30 @@
     (setq developers (car (org-map-entries 'scrum-get-developers "ID=\"TASKS\"")))
     (if (= 0 (length developers))
         (error "no developers found (they must have WPD property)"))
-    (insert "| NAME | ESTIMATED | ACTUAL | DONE | REMAINING | PENCILS DOWN | PROGRESS |\n|-")
+    (insert "| NAME | ESTIMATED | ACTUAL | DONE | REMAINING | CAPACITY | PROGRESS |\n|-")
     (dolist (developer developers)
+					;      (setq cap  (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED") / ( * hid (string-to-number (get-sprintlength))))
+      (setq cap ( / (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED") ( * hid (string-to-number (get-sprintlength)))))
       (setq est  (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED"))
       (setq act  (scrum-get-prop-value (scrum-create-match (car developer) '()) "ACTUAL"))
       (setq done (scrum-get-prop-value (scrum-create-match (car developer) org-done-keywords) "ESTIMATED"))
       (setq rem  (scrum-get-prop-value (scrum-create-match (car developer) org-not-done-keywords) "ESTIMATED"))
 
       (insert "\n| " (car developer)
+
               " | " (number-to-string est)
               " | " (number-to-string act)
               " | " (number-to-string done)
               " | " (number-to-string rem)
-              " | " (format-time-string "%Y-%m-%d" (scrum-get-finish-date rem (cdr developer)))
+;              " | " (format-time-string "%Y-%m-%d" (scrum-get-finish-date rem (cdr developer)))
+	      " | " (concat (format "%.0f" (round (+ .1 (* cap 100.0)))) "%") ; round up to the nearest % if .5 orr over.
               " | " (scrum-draw-progress-bar est done)
               " |"))
     (org-ctrl-c-ctrl-c)))
+
+(defun get-sprintlength ()
+  "Get the length of the sprint in days"
+  (car (org-map-entries (lambda () (org-entry-get (point) "SPRINTLENGTH") ) "ID=\"TASKS\"")))
 
 (defun org-dblock-write:block-update-burndown (params)
   "generate burndown table"
@@ -258,6 +268,7 @@
         (error "couldn't find node with ID=\"TASKS\" containing \"SPRINTLENGTH\" and \"SPRINTSTART\" properties"))
 
     (setq closed (org-map-entries (lambda ()
+				    (print (nth 4 (org-heading-components)))
         (let ((n 0)
               closetime
               closestr)
@@ -324,8 +335,8 @@
         (re-search-forward "#\\+BEGIN: .*block-update-graph")   ;; must exist
         (forward-line 1)                            ;; move into dynamic block
         (setq pt (point))
-        (insert-file-contents fname)
-        (delete-file fname)                         ;; del temp file
+;        (insert-file-contents fname)
+;;        (delete-file fname)                         ;; del temp file
         (delete-char 1)                             ;; form feed
         (while (not (looking-at "#\\+END"))
           (insert ":")
