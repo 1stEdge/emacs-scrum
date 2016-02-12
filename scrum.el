@@ -70,6 +70,7 @@
                                               (capitalize (substring (car ii) 4 (length (car ii))))
                                               (string-to-number (cdr ii)))))
                       ret))
+    (print ret)
     ret))
 
 (defun scrum-get-prop-value (match prop)
@@ -211,8 +212,8 @@
 (defun org-dblock-write:block-update-summary (params)
   "generate scrum summary table"
   (let (developers
-	(hid  8.0)                ;; hours in a day
-	(cap  0)                ;; capacity
+	(hid  8.0)              ;; hours in a day
+	(load  0)               ;; developer load
         (est  0)                ;; hours estimated
         (act  0)                ;; actual hours spent
         (done 0)                ;; hours of estimates that are done
@@ -220,30 +221,39 @@
     (setq developers (car (org-map-entries 'scrum-get-developers "ID=\"TASKS\"")))
     (if (= 0 (length developers))
         (error "no developers found (they must have WPD property)"))
-    (insert "| NAME | ESTIMATED | ACTUAL | DONE | REMAINING | CAPACITY | PROGRESS |\n|-")
+    (insert "| NAME | EST | ACT | DONE | TODO | CAP | LOAD | PROGRESS |\n|-")
     (dolist (developer developers)
-					;      (setq cap  (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED") / ( * hid (string-to-number (get-sprintlength))))
-      (setq cap ( / (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED") ( * hid (string-to-number (get-sprintlength)))))
+
+;   (setq cap ( / (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED") ( * hid (string-to-number (get-sprintlength)))))
+
       (setq est  (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED"))
+      (setq cap  (* (* (get-sprint-length) hid) (/ (cdr developer) 10.0)))
+      (setq load  (if (= est 0.0)
+				0.0
+			      (- 100 (/ cap est))
+			      ))
       (setq act  (scrum-get-prop-value (scrum-create-match (car developer) '()) "ACTUAL"))
       (setq done (scrum-get-prop-value (scrum-create-match (car developer) org-done-keywords) "ESTIMATED"))
       (setq rem  (scrum-get-prop-value (scrum-create-match (car developer) org-not-done-keywords) "ESTIMATED"))
-
+      (print (format "developer %s" (car developer)))
+      (print "capacity = sprint hours * dev capacity")
+      (print (format "%f = %f * %f" cap (* (get-sprint-length) hid) (/ (cdr developer) 10.0)))
+      (print "load = cap / dev estimated")
+      (print (format "%f = %f / %f\r\n" load cap est))
       (insert "\n| " (car developer)
-
               " | " (number-to-string est)
               " | " (number-to-string act)
               " | " (number-to-string done)
               " | " (number-to-string rem)
-;              " | " (format-time-string "%Y-%m-%d" (scrum-get-finish-date rem (cdr developer)))
-	      " | " (concat (format "%.0f" (round (+ .1 (* cap 100.0)))) "%") ; round up to the nearest % if .5 orr over.
+	      " | " (concat (format "%.0f" (* 10 (round cap 10)) "%"))
+	      " | " (concat (format "%.0f" (* 10 (round load 10))) "%") 
               " | " (scrum-draw-progress-bar est done)
               " |"))
     (org-ctrl-c-ctrl-c)))
 
-(defun get-sprintlength ()
+(defun get-sprint-length ()
   "Get the length of the sprint in days"
-  (car (org-map-entries (lambda () (org-entry-get (point) "SPRINTLENGTH") ) "ID=\"TASKS\"")))
+  (string-to-number (car (org-map-entries (lambda () (org-entry-get (point) "SPRINTLENGTH") ) "ID=\"TASKS\""))))
 
 (defun org-dblock-write:block-update-burndown (params)
   "generate burndown table"
