@@ -213,7 +213,7 @@
   "generate scrum summary table"
   (let (developers
 	(hid  8.0)              ;; hours in a day
-	(load  0)               ;; developer load
+	(load  0)               ;; developer load based on capacity and estimated hours
         (est  0)                ;; hours estimated
         (act  0)                ;; actual hours spent
         (done 0)                ;; hours of estimates that are done
@@ -224,29 +224,22 @@
     (insert "| NAME | EST | ACT | DONE | TODO | CAP | LOAD | PROGRESS |\n|-")
     (dolist (developer developers)
 
-;   (setq cap ( / (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED") ( * hid (string-to-number (get-sprintlength)))))
-
       (setq est  (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED"))
       (setq cap  (* (* (get-sprint-length) hid) (/ (cdr developer) 10.0)))
-      (setq load  (if (= est 0.0)
+      (setq load  (if (= est 0.0) ;; if the developer doesn't have estimated hours then they're not loaded
 				0.0
-			      (- 100 (/ cap est))
-			      ))
+		    (/ est cap) ;; load = estimated / capacity
+		    ))
       (setq act  (scrum-get-prop-value (scrum-create-match (car developer) '()) "ACTUAL"))
       (setq done (scrum-get-prop-value (scrum-create-match (car developer) org-done-keywords) "ESTIMATED"))
       (setq rem  (scrum-get-prop-value (scrum-create-match (car developer) org-not-done-keywords) "ESTIMATED"))
-      (print (format "developer %s" (car developer)))
-      (print "capacity = sprint hours * dev capacity")
-      (print (format "%f = %f * %f" cap (* (get-sprint-length) hid) (/ (cdr developer) 10.0)))
-      (print "load = cap / dev estimated")
-      (print (format "%f = %f / %f\r\n" load cap est))
       (insert "\n| " (car developer)
               " | " (number-to-string est)
               " | " (number-to-string act)
               " | " (number-to-string done)
               " | " (number-to-string rem)
-	      " | " (concat (format "%.0f" (* 10 (round cap 10)) "%"))
-	      " | " (concat (format "%.0f" (* 10 (round load 10))) "%") 
+	      " | " (concat (format "%.0f" (* 10 (round cap 10))) "%")
+	      " | " (concat (format "%.0f" (* 10 (round (* 100 load) 10))) "%") 
               " | " (scrum-draw-progress-bar est done)
               " |"))
     (org-ctrl-c-ctrl-c)))
