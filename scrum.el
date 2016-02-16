@@ -225,10 +225,11 @@
     (dolist (developer developers)
 
       (setq est  (scrum-get-prop-value (scrum-create-match (car developer) (append org-not-done-keywords org-done-keywords)) "ESTIMATED"))
-      (setq cap  (* (* (get-sprint-length) hid) (/ (cdr developer) 10.0)))
+      (setq cap   (/ (cdr developer) 10.0))
+      (setq cap-hours  (* (* (get-sprint-length) hid) cap))
       (setq load  (if (= est 0.0) ;; if the developer doesn't have estimated hours then they're not loaded
-				0.0
-		    (/ est cap) ;; load = estimated / capacity
+		      0.0
+		    (/ est cap-hours) ;; load = estimated / capacity
 		    ))
       (setq act  (scrum-get-prop-value (scrum-create-match (car developer) '()) "ACTUAL"))
       (setq done (scrum-get-prop-value (scrum-create-match (car developer) org-done-keywords) "ESTIMATED"))
@@ -238,7 +239,7 @@
               " | " (number-to-string act)
               " | " (number-to-string done)
               " | " (number-to-string rem)
-	      " | " (concat (format "%.0f" (* 10 (round cap 10))) "%")
+	      " | " (concat (format "%.0f" (* 100 cap)) "%")
 	      " | " (concat (format "%.0f" (* 10 (round (* 100 load) 10))) "%") 
               " | " (scrum-draw-progress-bar est done)
               " |"))
